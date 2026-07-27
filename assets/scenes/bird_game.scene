@@ -519,10 +519,10 @@
       "__uuid__": "677398f6-d81a-4e3b-bc0a-231e3650133b",
       "__expectedType__": "cc.Prefab"
     },
-    "pipeMoveSpeed": -300,
-    "pipeSpacing": 300,
-    "spacingMinValue": 150,
-    "spacingMaxValue": 200,
+    "pipeMoveSpeed": -180,
+    "pipeSpacing": 380,
+    "spacingMinValue": 220,
+    "spacingMaxValue": 280,
     "_id": ""
   },
   {
@@ -2861,12 +2861,12 @@
     "__prefab": null,
     "goldScore": 20,
     "silverScore": 10,
-    "easySpacingMin": 190,
-    "easySpacingMax": 240,
-    "hardSpacingMin": 145,
-    "hardSpacingMax": 185,
-    "basePipeSpeed": -300,
-    "maxPipeSpeed": -420,
+    "easySpacingMin": 250,
+    "easySpacingMax": 310,
+    "hardSpacingMin": 200,
+    "hardSpacingMax": 250,
+    "basePipeSpeed": -180,
+    "maxPipeSpeed": -260,
     "pipeManager": {
       "__id__": 12
     },

@@ -7,17 +7,19 @@ export class PipeManager3x extends Component {
   @property(Prefab)
   pipePrefab: Prefab | null = null;
 
+  /** 更慢，降低难度 */
   @property
-  pipeMoveSpeed = -300;
+  pipeMoveSpeed = -180;
+
+  /** 管间距（生成间隔用），略加大喘息 */
+  @property
+  pipeSpacing = 380;
 
   @property
-  pipeSpacing = 300;
+  spacingMinValue = 220;
 
   @property
-  spacingMinValue = 150;
-
-  @property
-  spacingMaxValue = 200;
+  spacingMaxValue = 280;
 
   pipeList: PipeGroup3x[] = [];
   activePipeList: PipeGroup3x[] = [];
@@ -48,7 +50,7 @@ export class PipeManager3x extends Component {
     }
     let pipeGroup: PipeGroup3x | null = null;
     if (this.pipePool.size() > 0) {
-      pipeGroup = this.pipePool.get().getComponent(PipeGroup3x);
+      pipeGroup = this.pipePool.get()!.getComponent(PipeGroup3x);
     } else {
       pipeGroup = instantiate(this.pipePrefab).getComponent(PipeGroup3x);
     }
@@ -67,6 +69,10 @@ export class PipeManager3x extends Component {
     if (activeIndex !== -1) {
       this.activePipeList.splice(activeIndex, 1);
     }
+    const listIndex = this.pipeList.indexOf(pipe);
+    if (listIndex !== -1) {
+      this.pipeList.splice(listIndex, 1);
+    }
     pipe.node.active = false;
     this.pipePool.put(pipe.node);
   }
@@ -75,22 +81,57 @@ export class PipeManager3x extends Component {
     this.activePipeList.forEach(callback);
   }
 
+  /** @deprecated 计分改由 Bird 按 active 列表选下一根，保留兼容 */
   getNext() {
     return this.pipeList.shift() || null;
   }
 
-  resumeAfterRevive(birdX: number) {
-    const visiblePipes = this.activePipeList.filter((pipe) => pipe.node.position.x > birdX + 80);
-    this.activePipeList = visiblePipes;
-    this.pipeList = visiblePipes.slice();
+  /**
+   * 复活清场：清掉鸟前方 clearAhead 内的管子，并在更远处保留/生成，
+   * 避免在死亡点原地复活立刻撞管。
+   */
+  resumeAfterRevive(birdX: number, clearAhead = 420) {
+    const keep: PipeGroup3x[] = [];
+    const drop: PipeGroup3x[] = [];
+    for (const pipe of this.activePipeList) {
+      if (!pipe?.node?.isValid) {
+        continue;
+      }
+      if (pipe.node.position.x > birdX + clearAhead) {
+        keep.push(pipe);
+      } else {
+        drop.push(pipe);
+      }
+    }
+    for (const p of drop) {
+      p.node.active = false;
+      this.pipePool.put(p.node);
+    }
+    this.activePipeList = keep;
+    this.pipeList = keep.slice().sort((a, b) => a.node.position.x - b.node.position.x);
     this.unschedule(this.spawnPipe);
     const spawnInterval = Math.abs(this.pipeSpacing / this.pipeMoveSpeed);
-    this.schedule(this.spawnPipe, spawnInterval);
+    // 稍晚再出第一根，给玩家反应时间
+    this.scheduleOnce(() => {
+      if (!this.pipeIsRunning) {
+        return;
+      }
+      this.spawnPipe();
+      this.schedule(this.spawnPipe, spawnInterval);
+    }, 0.85);
     this.pipeIsRunning = true;
   }
 
   reset() {
     this.unschedule(this.spawnPipe);
+    // 回收所有活跃管，避免残留
+    const snapshot = this.activePipeList.slice();
+    for (const p of snapshot) {
+      if (p?.node?.isValid) {
+        p.node.active = false;
+        this.pipePool.put(p.node);
+      }
+    }
     this.pipeList = [];
     this.activePipeList = [];
     this.pipeIsRunning = false;

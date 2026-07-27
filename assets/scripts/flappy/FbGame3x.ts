@@ -31,23 +31,25 @@ export class FbGame3x extends Component {
   @property
   silverScore = 10;
 
+  /** 管道开口：更大 = 更容易 */
   @property
-  easySpacingMin = 190;
+  easySpacingMin = 250;
 
   @property
-  easySpacingMax = 240;
+  easySpacingMax = 310;
 
   @property
-  hardSpacingMin = 145;
+  hardSpacingMin = 200;
 
   @property
-  hardSpacingMax = 185;
+  hardSpacingMax = 250;
+
+  /** 管道水平速度（负=向左），绝对值更小 = 更慢更好躲 */
+  @property
+  basePipeSpeed = -180;
 
   @property
-  basePipeSpeed = -300;
-
-  @property
-  maxPipeSpeed = -420;
+  maxPipeSpeed = -260;
 
   @property(PipeManager3x)
   pipeManager: PipeManager3x | null = null;
@@ -334,7 +336,8 @@ export class FbGame3x extends Component {
     if (!this.pipeManager) {
       return;
     }
-    const difficulty = Math.min(this.score, 20) / 20;
+    // 前 8 分几乎不加压，之后缓慢变难
+    const difficulty = Math.min(Math.max(this.score - 8, 0), 24) / 24;
     this.pipeManager.pipeMoveSpeed = this.basePipeSpeed + (this.maxPipeSpeed - this.basePipeSpeed) * difficulty;
     this.pipeManager.spacingMinValue = this.easySpacingMin + (this.hardSpacingMin - this.easySpacingMin) * difficulty;
     this.pipeManager.spacingMaxValue = this.easySpacingMax + (this.hardSpacingMax - this.easySpacingMax) * difficulty;
@@ -390,10 +393,15 @@ export class FbGame3x extends Component {
       this.setStoredNumber(STORAGE_KEYS.bestScore, bestScore);
     }
 
-    currentScoreNode?.getComponent(Label) && (currentScoreNode.getComponent(Label)!.string = String(this.score));
-    bestScoreNode?.getComponent(Label) && (bestScoreNode.getComponent(Label)!.string = String(bestScore));
+    // 上下两个数字：上=本局得分，下=历史最高（原先只有裸数字「1」「1」容易误解）
+    this.setScoreRow(currentScoreNode, '本局', this.score);
+    this.setScoreRow(bestScoreNode, '最高', bestScore);
     if (tipsLabelNode?.getComponent(Label)) {
-      tipsLabelNode.getComponent(Label)!.string = this.revivedThisRun ? '本局已复活，点击重新开始' : '看完整广告可复活一次';
+      tipsLabelNode.getComponent(Label)!.string = this.revivedThisRun
+        ? '本局已复活，请点「再来一局」'
+        : '点「看广告复活」会先播放广告（预览环境为模拟广告）';
+      tipsLabelNode.getComponent(Label)!.fontSize = 22;
+      getUITransform(tipsLabelNode)?.setContentSize(420, 50);
     }
 
     resources.load('res_bundle', SpriteAtlas, (_err, atlas) => {
@@ -413,6 +421,25 @@ export class FbGame3x extends Component {
       }
     });
 
+    // 放大可点区域，避免「按钮很小」
+    this.enlargeHitTarget(startButtonNode, 200, 90, '再来一局', 32);
+    this.enlargeHitTarget(backButtonNode, 160, 70, '返回', 28);
+    this.enlargeHitTarget(reviveButtonNode, 200, 70, '看广告复活', 26);
+    if (startButtonNode) {
+      startButtonNode.setPosition(0, -120, 0);
+    }
+    if (backButtonNode) {
+      backButtonNode.setPosition(-140, -210, 0);
+    }
+    if (reviveButtonNode) {
+      reviveButtonNode.setPosition(140, -210, 0);
+    }
+    if (resultBoardNode) {
+      getUITransform(resultBoardNode)?.setContentSize(320, 180);
+      // 固定在可读位置，避免 tween 到 y=200 叠在标题上
+      resultBoardNode.setPosition(0, 20, 0);
+    }
+
     if (startButtonNode) startButtonNode.active = true;
     if (backButtonNode) backButtonNode.active = true;
     if (reviveButtonNode) {
@@ -420,26 +447,73 @@ export class FbGame3x extends Component {
       ensureUIOpacity(reviveButtonNode).opacity = this.revivedThisRun ? 0 : 255;
     }
     this.gameOverMenu.active = true;
+    this.gameOverMenu.setSiblingIndex(this.node.children.length - 1);
 
     if (gameOverNode) {
       ensureUIOpacity(gameOverNode).opacity = 255;
-      tween(gameOverNode)
-        .by(0.2, { position: new Vec3(0, 10, 0) })
-        .by(0.3, { position: new Vec3(0, -10, 0) })
-        .start();
+      const goLabel = gameOverNode.getComponent(Label);
+      if (goLabel) {
+        goLabel.string = '游戏结束';
+        goLabel.fontSize = 42;
+      }
+      gameOverNode.setPosition(0, 200, 0);
     }
     if (startButtonNode) {
       ensureUIOpacity(startButtonNode).opacity = 255;
       startButtonNode.off(Node.EventType.TOUCH_END, this.restart, this);
       startButtonNode.on(Node.EventType.TOUCH_END, this.restart, this);
     }
+    if (backButtonNode) {
+      backButtonNode.off(Node.EventType.TOUCH_END, this.backToStart, this);
+      backButtonNode.on(Node.EventType.TOUCH_END, this.backToStart, this);
+    }
     if (reviveButtonNode) {
       reviveButtonNode.off(Node.EventType.TOUCH_END, this.onReviveClick, this);
       reviveButtonNode.on(Node.EventType.TOUCH_END, this.onReviveClick, this);
     }
-    if (resultBoardNode) {
-      tween(resultBoardNode).delay(0.3).to(0.9, { position: new Vec3(resultBoardNode.position.x, 200, 0) }, { easing: 'cubicInOut' }).start();
+  }
+
+  /** 给结算板两行分数加「本局/最高」前缀，避免只显示两个相同数字。 */
+  setScoreRow(node: Node | null | undefined, title: string, value: number) {
+    if (!node) {
+      return;
     }
+    const label = node.getComponent(Label);
+    if (!label) {
+      return;
+    }
+    label.string = `${title}  ${value}`;
+    label.fontSize = 30;
+    label.horizontalAlign = Label.HorizontalAlign.LEFT;
+    getUITransform(node)?.setContentSize(200, 44);
+  }
+
+  enlargeHitTarget(node: Node | null | undefined, w: number, h: number, text: string, fontSize: number) {
+    if (!node) {
+      return;
+    }
+    getUITransform(node)?.setContentSize(w, h);
+    let label = node.getComponent(Label);
+    if (!label) {
+      label = node.getComponentInChildren(Label);
+    }
+    if (!label) {
+      const child = new Node('label');
+      child.layer = node.layer;
+      child.addComponent(UITransform).setContentSize(w, h);
+      label = child.addComponent(Label);
+      node.addChild(child);
+    }
+    label.string = text;
+    label.fontSize = fontSize;
+    label.horizontalAlign = Label.HorizontalAlign.CENTER;
+    label.verticalAlign = Label.VerticalAlign.CENTER;
+    label.overflow = Label.Overflow.SHRINK;
+    ensureUIOpacity(node).opacity = 255;
+  }
+
+  backToStart() {
+    director.loadScene('flappy_start');
   }
 
   onReviveClick() {
@@ -447,9 +521,14 @@ export class FbGame3x extends Component {
       return;
     }
     this.enableInput(false);
+    // 先播激励广告（预览/无 adUnit 时走模拟全屏广告，不再瞬间复活）
     AdManager.showRewarded().then((finished) => {
       if (!finished) {
         this.enableInput(true);
+        const tips = this.gameOverMenu?.getChildByName('tipsLabel')?.getComponent(Label);
+        if (tips) {
+          tips.string = '未看完广告，无法复活';
+        }
         return;
       }
       this.revivedThisRun = true;
@@ -474,16 +553,20 @@ export class FbGame3x extends Component {
     }
     this.gameOverShown = false;
     this.isPaused = false;
-    const birdHalf = (getUITransform(this.bird.node)?.height || 0) / 2;
+
+    // 安全复活点：画布水平偏左、垂直居中偏上，避开地面与死亡点
+    const canvasH = getUITransform(canvas)?.height || 640;
+    const canvasW = getUITransform(canvas)?.width || 960;
+    const safeX = -canvasW * 0.28;
     const groundTop =
-      this.ground.position.y + (getUITransform(this.ground)?.height || 0) / 2 + birdHalf + 20;
-    const nextY = Math.max(
-      groundTop,
-      Math.min((getUITransform(canvas)?.height || 0) / 4, this.bird.node.position.y + 140),
-    );
-    this.bird.node.setPosition(this.bird.node.position.x, nextY);
+      this.ground.position.y + (getUITransform(this.ground)?.height || 140) / 2;
+    const safeY = Math.min(canvasH * 0.12, Math.max(groundTop + 140, 40));
+
+    // 先清近处管子，再放鸟，避免复活瞬间重叠
+    this.pipeManager?.resumeAfterRevive(safeX, 480);
+    this.bird.node.setPosition(safeX, safeY);
     this.bird.revive();
-    this.pipeManager?.resumeAfterRevive(this.bird.node.position.x);
+    this.applyDifficulty();
     this.ground.getComponent(Scroller3x)?.startScroll();
     this.setPauseButtonVisible(true);
     this.refreshPauseButtonLabel();

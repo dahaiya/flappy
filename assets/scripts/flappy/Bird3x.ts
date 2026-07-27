@@ -1,5 +1,6 @@
 import { _decorator, Animation, Collider2D, Component, Contact2DType, Enum, find, Node, tween, UITransform, Vec3 } from 'cc';
 import type { FbGame3x } from './FbGame3x';
+import type { PipeGroup3x } from './PipeGroup3x';
 const { ccclass, property } = _decorator;
 
 export enum BirdState {
@@ -13,11 +14,12 @@ Enum(BirdState);
 
 @ccclass('Bird3x')
 export class Bird3x extends Component {
+  /** 略降起跳，配合更慢管道，手感更稳 */
   @property
-  initRiseSpeed = 800;
+  initRiseSpeed = 520;
 
   @property
-  gravity = 1000;
+  gravity = 1200;
 
   @property({ type: Node })
   ground: Node | null = null;
@@ -25,7 +27,7 @@ export class Bird3x extends Component {
   state: BirdState = BirdState.Ready;
   private game: FbGame3x | null = null;
   private currentSpeed = 0;
-  private nextPipe: any = null;
+  private nextPipe: PipeGroup3x | null = null;
   private collideWithPipe = false;
   private collideWithGround = false;
   private gameOverTriggered = false;
@@ -40,7 +42,6 @@ export class Bird3x extends Component {
     }
   }
 
-  /** Scene may omit collider; still resolve ground node for AABB. */
   resolveGround() {
     if (this.ground?.isValid) {
       return this.ground;
@@ -65,13 +66,32 @@ export class Bird3x extends Component {
 
   startFly() {
     this.resolveGround();
-    this.getNextPipe();
+    this.syncNextPipe();
     this.anim?.stop();
     this.rise();
   }
 
+  /** 取 x 最大且仍在鸟前方的管道作为计分目标（不 shift 丢管道） */
+  syncNextPipe() {
+    const list = this.game?.pipeManager?.activePipeList || [];
+    const bx = this.node.position.x;
+    let best: PipeGroup3x | null = null;
+    let bestX = Infinity;
+    for (const p of list) {
+      if (!p?.node?.isValid) {
+        continue;
+      }
+      const x = p.node.position.x;
+      if (x + 40 > bx && x < bestX) {
+        bestX = x;
+        best = p;
+      }
+    }
+    this.nextPipe = best;
+  }
+
   getNextPipe() {
-    this.nextPipe = this.game?.pipeManager?.getNext() || null;
+    this.syncNextPipe();
   }
 
   update(dt: number) {
@@ -81,7 +101,9 @@ export class Bird3x extends Component {
     if (this.state === BirdState.Ready || this.state === BirdState.Dead) {
       return;
     }
-    this.updatePosition(dt);
+    // 限制单帧，避免卡顿后穿模
+    const step = Math.min(dt, 0.05);
+    this.updatePosition(step);
     this.updateState();
     this.detectCollision();
     this.fixBirdFinalPosition();
@@ -93,6 +115,11 @@ export class Bird3x extends Component {
       return;
     }
     this.currentSpeed -= dt * this.gravity;
+    // 终端速度，避免掉落过猛
+    const minVy = -700;
+    if (this.currentSpeed < minVy) {
+      this.currentSpeed = minVy;
+    }
     this.node.setPosition(this.node.position.x, this.node.position.y + dt * this.currentSpeed);
   }
 
@@ -107,11 +134,6 @@ export class Bird3x extends Component {
     }
   }
 
-  /**
-   * Top of ground sprite in Canvas space.
-   * bird_game: ground y=-250, h=140 → top ≈ -180 (not canvas bottom -320).
-   * Without this, bird falls through the visible "台阶" before stopping.
-   */
   getGroundTopY(birdHalf: number) {
     const g = this.resolveGround();
     if (g?.isValid) {
@@ -140,7 +162,6 @@ export class Bird3x extends Component {
     const { topY, bottomY } = this.getPlayBounds();
     const y = this.node.position.y;
 
-    // Ceiling
     if (y >= topY) {
       this.node.setPosition(this.node.position.x, topY);
       this.currentSpeed = Math.min(this.currentSpeed, 0);
@@ -148,57 +169,100 @@ export class Bird3x extends Component {
       return;
     }
 
-    // Ground / 台阶 top — pure AABB (scene has 0 BoxCollider2D)
     if (y <= bottomY || this.collideWithGround) {
       this.killOnGround();
       return;
     }
 
-    // Pipes: physics contact if colliders exist; else AABB vs next pipe
     if (this.state !== BirdState.Drop) {
-      if (this.collideWithPipe || this.hitPipeAabb()) {
+      if (this.collideWithPipe || this.hitAnyPipeAabb()) {
         this.failAndDrop(false);
         return;
       }
     }
 
-    if (!this.nextPipe) {
+    this.tryScore();
+  }
+
+  tryScore() {
+    if (!this.nextPipe?.node?.isValid) {
+      this.syncNextPipe();
+    }
+    const pipe = this.nextPipe;
+    if (!pipe?.node?.isValid) {
       return;
     }
-    const pipeWidth = this.nextPipe.topPipe?.getComponent(UITransform)?.width || 0;
-    const crossPipe = this.node.position.x > this.nextPipe.node.position.x + pipeWidth / 2;
-    if (crossPipe) {
+    const pipeW = pipe.topPipe?.getComponent(UITransform)?.width || 75;
+    // 鸟完全越过管子中心偏右再得分
+    if (this.node.position.x > pipe.node.position.x + pipeW * 0.35) {
       this.game?.gainScore();
-      this.getNextPipe();
+      this.nextPipe = null;
+      this.syncNextPipe();
     }
   }
 
-  /** Fallback when scene has no 2D colliders (current bird_game.scene). */
-  hitPipeAabb(): boolean {
-    const pipe = this.nextPipe;
-    if (!pipe?.node?.isValid || !pipe.topPipe || !pipe.bottomPipe) {
+  /**
+   * 正确处理 UITransform 锚点：
+   * topPipe anchor (0.5,1) → 位置在管顶，实体向下伸
+   * bottomPipe anchor (0.5,0) → 位置在管底，实体向上伸
+   * 旧逻辑按中心算，几乎碰不到管子。
+   */
+  hitAnyPipeAabb(): boolean {
+    const pipes = this.game?.pipeManager?.activePipeList || [];
+    if (!pipes.length) {
       return false;
     }
     const birdUi = this.node.getComponent(UITransform);
-    const bw = (birdUi?.width || 60) * 0.7;
-    const bh = (birdUi?.height || 60) * 0.7;
+    const bw = (birdUi?.width || 60) * 0.85;
+    const bh = (birdUi?.height || 60) * 0.85;
     const bx = this.node.position.x;
     const by = this.node.position.y;
+    const birdL = bx - bw / 2;
+    const birdR = bx + bw / 2;
+    const birdB = by - bh / 2;
+    const birdT = by + bh / 2;
 
-    const hit = (pipeNode: Node) => {
-      const ui = pipeNode.getComponent(UITransform);
-      if (!ui) {
-        return false;
+    for (const group of pipes) {
+      if (!group?.node?.isValid) {
+        continue;
       }
-      // pipe child local + group world-ish (group under pipeManager at 0,0)
-      const px = pipe.node.position.x + pipeNode.position.x;
-      const py = pipe.node.position.y + pipeNode.position.y;
-      const hw = ui.width / 2;
-      const hh = ui.height / 2;
-      return Math.abs(bx - px) < hw + bw / 2 && Math.abs(by - py) < hh + bh / 2;
-    };
+      if (this.nodeHitsPipeSprite(group.node, group.topPipe, birdL, birdR, birdB, birdT)) {
+        return true;
+      }
+      if (this.nodeHitsPipeSprite(group.node, group.bottomPipe, birdL, birdR, birdB, birdT)) {
+        return true;
+      }
+    }
+    return false;
+  }
 
-    return hit(pipe.topPipe) || hit(pipe.bottomPipe);
+  nodeHitsPipeSprite(
+    group: Node,
+    pipeNode: Node | null,
+    birdL: number,
+    birdR: number,
+    birdB: number,
+    birdT: number,
+  ): boolean {
+    if (!pipeNode?.isValid) {
+      return false;
+    }
+    const ui = pipeNode.getComponent(UITransform);
+    if (!ui) {
+      return false;
+    }
+    const ax = ui.anchorX;
+    const ay = ui.anchorY;
+    const w = ui.width;
+    const h = ui.height;
+    // group 在 pipeManager 下，与 bird 同属 Canvas 空间
+    const x = group.position.x + pipeNode.position.x;
+    const y = group.position.y + pipeNode.position.y;
+    const left = x - ax * w;
+    const right = x + (1 - ax) * w;
+    const bottom = y - ay * h;
+    const top = y + (1 - ay) * h;
+    return birdL < right && birdR > left && birdB < top && birdT > bottom;
   }
 
   killOnGround() {
@@ -227,7 +291,6 @@ export class Bird3x extends Component {
     this.state = BirdState.Drop;
     this.runDropAction();
     this.anim?.stop();
-    // End the run immediately so "掉落也不停止" cannot continue as free play
     this.triggerGameOver();
   }
 
@@ -269,18 +332,24 @@ export class Bird3x extends Component {
     this.runRiseAction();
   }
 
+  /**
+   * 复活：清状态，给一点初速，由 FbGame 负责放到安全坐标并清管。
+   */
   revive() {
     this.resolveGround();
-    this.state = BirdState.FreeFall;
+    this.state = BirdState.Rise;
     this.collideWithPipe = false;
     this.collideWithGround = false;
     this.gameOverTriggered = false;
-    this.currentSpeed = 0;
+    this.currentSpeed = this.initRiseSpeed * 0.55;
+    this.nextPipe = null;
     this.tweenStopper?.stop?.();
     this.tweenStopper = null;
     this.node.setRotationFromEuler(0, 0, 0);
     this.anim?.play('birdFlapping');
     this.anim?.play('birdWing');
+    this.runRiseAction();
+    this.syncNextPipe();
   }
 
   runRiseAction() {

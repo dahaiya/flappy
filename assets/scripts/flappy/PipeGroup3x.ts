@@ -13,16 +13,16 @@ function getHeight(node: Node | null) {
 @ccclass('PipeGroup3x')
 export class PipeGroup3x extends Component {
   @property
-  topPipeMinHeight = 100;
+  topPipeMinHeight = 80;
 
   @property
-  bottomPipeMinHeight = 100;
+  bottomPipeMinHeight = 80;
 
   @property
-  spacingMinValue = 150;
+  spacingMinValue = 220;
 
   @property
-  spacingMaxValue = 200;
+  spacingMaxValue = 280;
 
   @property(Node)
   topPipe: Node | null = null;
