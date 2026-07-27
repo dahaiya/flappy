@@ -1,0 +1,6 @@
+{
+  "sourceProject": "../game_with_cocosCreater",
+  "sourceVersion": "2.3.4",
+  "targetVersion": "3.8.x",
+  "status": "scaffolded"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "flappy-cocos3-migration",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cocos Creator 3.x migration workspace for Flappy Bird",
+  "type": "module",
+  "creator": {
+    "version": "3.8.8"
+  },
+  "uuid": "16fc10f9-53e4-4adc-8a46-7fccf3317f2d"
+}

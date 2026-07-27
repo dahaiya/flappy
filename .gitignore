@@ -1,0 +1,28 @@
+# Cocos Creator / IDE
+library/
+temp/
+local/
+build/
+build-templates/
+native/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Windows ADS junk
+*:Zone.Identifier
+*Zone.Identifier
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / env
+*.log
+.env
+.env.*
+
+# Optional local creator cache (keep project settings)
+.creator/default-meta.json
