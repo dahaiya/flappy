@@ -162,11 +162,11 @@ export class Bird3x extends Component {
     const { topY, bottomY } = this.getPlayBounds();
     const y = this.node.position.y;
 
+    // 碰顶：只夹紧在屏幕内，不算失败、不 gameOver
     if (y >= topY) {
       this.node.setPosition(this.node.position.x, topY);
       this.currentSpeed = Math.min(this.currentSpeed, 0);
-      this.failAndDrop(true);
-      return;
+      // 不 return：本帧仍可判管道/计分（顶边不是致死区）
     }
 
     if (y <= bottomY || this.collideWithGround) {
