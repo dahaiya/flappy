@@ -348,10 +348,10 @@
     "__prefab": {
       "__id__": 13
     },
-    "topPipeMinHeight": 100,
-    "bottomPipeMinHeight": 100,
-    "spacingMinValue": 150,
-    "spacingMaxValue": 200,
+    "topPipeMinHeight": 70,
+    "bottomPipeMinHeight": 70,
+    "spacingMinValue": 260,
+    "spacingMaxValue": 320,
     "topPipe": {
       "__id__": 2
     },

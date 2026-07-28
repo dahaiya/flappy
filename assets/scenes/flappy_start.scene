@@ -806,8 +806,8 @@
     },
     "_enabled": true,
     "__prefab": null,
-    "initRiseSpeed": 800,
-    "gravity": 1000,
+    "initRiseSpeed": 480,
+    "gravity": 1100,
     "ground": {
       "__id__": 10
     },

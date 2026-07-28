@@ -31,18 +31,18 @@ export class FbGame3x extends Component {
   @property
   silverScore = 10;
 
-  /** 管道开口：更大 = 更容易 */
+  /** 管道开口：更大 = 柱子挡路更短、更好过 */
   @property
-  easySpacingMin = 250;
+  easySpacingMin = 280;
 
   @property
-  easySpacingMax = 310;
+  easySpacingMax = 340;
 
   @property
-  hardSpacingMin = 200;
+  hardSpacingMin = 230;
 
   @property
-  hardSpacingMax = 250;
+  hardSpacingMax = 280;
 
   /** 管道水平速度（负=向左），绝对值更小 = 更慢更好躲 */
   @property

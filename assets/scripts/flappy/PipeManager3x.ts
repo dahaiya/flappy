@@ -16,10 +16,10 @@ export class PipeManager3x extends Component {
   pipeSpacing = 380;
 
   @property
-  spacingMinValue = 220;
+  spacingMinValue = 260;
 
   @property
-  spacingMaxValue = 280;
+  spacingMaxValue = 320;
 
   pipeList: PipeGroup3x[] = [];
   activePipeList: PipeGroup3x[] = [];

@@ -30,6 +30,8 @@
 | 下面台阶/地面错乱、断层 | `Scroller3x.ts`（双条带一起滚） |
 | 飞出屏幕消失 | `Bird3x.ts` 上下边界 |
 | 缺暂停 | `FbGame3x.ts` `ensurePauseUi` |
+| 柱子太长 / 开口太窄 | `PipeGroup3x`/`PipeManager3x`/`FbGame3x` 的 spacing*；prefab `pipeGroup` |
+| 每次跳跃太高 | 场景 `initRiseSpeed`（常覆盖脚本默认）+ `Bird3x.initRiseSpeed` |
 
 ## 默认不要做
 

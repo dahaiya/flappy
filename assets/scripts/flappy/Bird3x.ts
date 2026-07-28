@@ -14,12 +14,12 @@ Enum(BirdState);
 
 @ccclass('Bird3x')
 export class Bird3x extends Component {
-  /** 略降起跳，配合更慢管道，手感更稳 */
+  /** 起跳初速：场景里若仍是 800 会跳太高；默认 480 更稳 */
   @property
-  initRiseSpeed = 520;
+  initRiseSpeed = 480;
 
   @property
-  gravity = 1200;
+  gravity = 1100;
 
   @property({ type: Node })
   ground: Node | null = null;
