@@ -34,7 +34,9 @@ Cocos Creator **3.8.8** 独立 Flappy 小游戏工程（可运行，不是未完
 
 ## Agent 注意
 
-- **先回答用户问题**，禁止只读 AGENTS/README 后空转  
+- **先回答用户问题**：读完 `AGENTS.md` 后立刻改代码/给结论，禁止只复述文档  
+- 禁止 `get_goal` 空转、禁止 “no task yet / What would you like…” 收尾  
+- 禁止反复 `ls`/`find`/cat README；cwd 固定本仓库，禁止伪造 `/Users/...` workdir  
 - 不要执行「检查 migration 进度 / 重建整个 3.x 工程」  
 - 玩法 bug 优先改 `Bird3x.ts`、`FbGame3x.ts`、`Scroller3x.ts`  
 - 场景无物理碰撞体：用坐标/AABB，不要等 Collider 回调  
