@@ -20,7 +20,7 @@ Cocos Creator **3.8.8** 独立 Flappy 小游戏工程（可运行，不是未完
 | `PipeManager3x.ts` / `PipeGroup3x.ts` | 管道 |
 | `Scroller3x.ts` | 地面滚动 |
 | `BirdGameStart3x.ts` | 开始页 |
-| `AdManager.ts` / `SkinManager.ts` | 广告 / 皮肤占位 |
+| `AdManager.ts` / `SkinManager.ts` | 微信激励/插屏广告（见 `docs/WECHAT_ADS.md`）/ 皮肤 |
 
 ## 文档
 
@@ -31,6 +31,7 @@ Cocos Creator **3.8.8** 独立 Flappy 小游戏工程（可运行，不是未完
 | `docs/SCENE_BUILD_GUIDE.md` | 场景节点与组件绑定参考 |
 | `docs/RESOURCE_COPY_LIST.md` | 缺资源时对照（不是待拷清单） |
 | `docs/FLAPPY_MVP_SETUP_2X_REFERENCE.md` | 旧 2.x 对照（一般不用） |
+| `docs/WECHAT_ADS.md` | 微信激励/插屏 adUnit 与 mock 说明 |
 
 ## Agent 注意
 

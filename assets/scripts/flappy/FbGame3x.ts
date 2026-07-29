@@ -1,4 +1,4 @@
-import { _decorator, BlockInputEvents, Color, Component, director, find, Label, Node, Sprite, SpriteAtlas, tween, UIOpacity, UITransform, Vec3, resources } from 'cc';
+import { _decorator, BlockInputEvents, Color, Component, director, find, Graphics, Label, Node, Sprite, SpriteAtlas, Tween, tween, UIOpacity, UITransform, Vec3, resources } from 'cc';
 import AdManager from './AdManager';
 import SkinManager from './SkinManager';
 import { Bird3x, BirdState } from './Bird3x';
@@ -86,6 +86,8 @@ export class FbGame3x extends Component {
   private pauseOverlay: Node | null = null;
   private pauseBtnLabel: Label | null = null;
   private wasPipeRunningBeforePause = false;
+  private gameOverBackdrop: Node | null = null;
+  private gameOverPanel: Node | null = null;
 
   onLoad() {
     this.bestScore = this.getStoredNumber(STORAGE_KEYS.bestScore);
@@ -149,7 +151,8 @@ export class FbGame3x extends Component {
   }
 
   gameOver() {
-    if (this.gameOverShown) {
+    // 已展示且仍在显示时不重复；若已复活把 menu 关掉后再次失败，必须能再弹
+    if (this.gameOverShown && this.gameOverMenu?.active) {
       return;
     }
     this.gameOverShown = true;
@@ -370,11 +373,23 @@ export class FbGame3x extends Component {
     if (!this.scoreLabel || !this.gameOverMenu) {
       return;
     }
-    tween(ensureUIOpacity(this.scoreLabel.node)).to(0.3, { opacity: 0 }).call(() => {
-      if (this.scoreLabel) {
-        this.scoreLabel.node.active = false;
-      }
-    }).start();
+
+    // 隐藏局内分数，避免和结算板叠字
+    const scoreOpacity = ensureUIOpacity(this.scoreLabel.node);
+    Tween.stopAllByTarget(scoreOpacity);
+    scoreOpacity.opacity = 0;
+    this.scoreLabel.node.active = false;
+
+    // 失败后 ready 提示 / 闪白遮罩都关掉，避免透出来或挡住弹窗
+    if (this.readyMenu) {
+      this.readyMenu.active = false;
+    }
+    if (this.maskLayer) {
+      Tween.stopAllByTarget(ensureUIOpacity(this.maskLayer));
+      this.maskLayer.active = false;
+    }
+
+    this.ensureGameOverChrome();
 
     const gameOverNode = this.gameOverMenu.getChildByName('gameOverLabel');
     const resultBoardNode = this.gameOverMenu.getChildByName('resultBoard');
@@ -393,15 +408,22 @@ export class FbGame3x extends Component {
       this.setStoredNumber(STORAGE_KEYS.bestScore, bestScore);
     }
 
-    // 上下两个数字：上=本局得分，下=历史最高（原先只有裸数字「1」「1」容易误解）
+    // 上下两个数字：上=本局得分，下=历史最高
     this.setScoreRow(currentScoreNode, '本局', this.score);
     this.setScoreRow(bestScoreNode, '最高', bestScore);
     if (tipsLabelNode?.getComponent(Label)) {
-      tipsLabelNode.getComponent(Label)!.string = this.revivedThisRun
-        ? '本局已复活，请点「再来一局」'
+      const tips = tipsLabelNode.getComponent(Label)!;
+      tips.string = this.revivedThisRun
+        ? '本局已复活过，请点「再来一局」'
         : '点「看广告复活」会先播放广告（预览环境为模拟广告）';
-      tipsLabelNode.getComponent(Label)!.fontSize = 22;
-      getUITransform(tipsLabelNode)?.setContentSize(420, 50);
+      tips.fontSize = 22;
+      tips.color = new Color(230, 230, 230, 255);
+      tips.horizontalAlign = Label.HorizontalAlign.CENTER;
+      tips.verticalAlign = Label.VerticalAlign.CENTER;
+      getUITransform(tipsLabelNode)?.setContentSize(460, 60);
+      tipsLabelNode.setPosition(0, -250, 0);
+      tipsLabelNode.active = true;
+      ensureUIOpacity(tipsLabelNode).opacity = 255;
     }
 
     resources.load('res_bundle', SpriteAtlas, (_err, atlas) => {
@@ -421,45 +443,74 @@ export class FbGame3x extends Component {
       }
     });
 
-    // 放大可点区域，避免「按钮很小」
-    this.enlargeHitTarget(startButtonNode, 200, 90, '再来一局', 32);
-    this.enlargeHitTarget(backButtonNode, 160, 70, '返回', 28);
-    this.enlargeHitTarget(reviveButtonNode, 200, 70, '看广告复活', 26);
+    // 用实心按钮盖住场景里半透明 START 图，避免「看不清再来一局/复活」
+    this.styleActionButton(startButtonNode, 240, 84, '再来一局', 34, new Color(76, 175, 80, 255));
+    this.styleActionButton(backButtonNode, 170, 70, '返回', 28, new Color(90, 98, 120, 255));
+    this.styleActionButton(reviveButtonNode, 220, 70, '看广告复活', 26, new Color(255, 167, 38, 255));
+
     if (startButtonNode) {
-      startButtonNode.setPosition(0, -120, 0);
+      startButtonNode.setPosition(0, -95, 0);
+      startButtonNode.active = true;
+      ensureUIOpacity(startButtonNode).opacity = 255;
     }
     if (backButtonNode) {
-      backButtonNode.setPosition(-140, -210, 0);
+      backButtonNode.setPosition(-140, -190, 0);
+      backButtonNode.active = true;
+      ensureUIOpacity(backButtonNode).opacity = 255;
     }
     if (reviveButtonNode) {
-      reviveButtonNode.setPosition(140, -210, 0);
-    }
-    if (resultBoardNode) {
-      getUITransform(resultBoardNode)?.setContentSize(320, 180);
-      // 固定在可读位置，避免 tween 到 y=200 叠在标题上
-      resultBoardNode.setPosition(0, 20, 0);
-    }
-
-    if (startButtonNode) startButtonNode.active = true;
-    if (backButtonNode) backButtonNode.active = true;
-    if (reviveButtonNode) {
+      reviveButtonNode.setPosition(140, -190, 0);
+      // 本局已复活则隐藏，避免误点
       reviveButtonNode.active = !this.revivedThisRun;
       ensureUIOpacity(reviveButtonNode).opacity = this.revivedThisRun ? 0 : 255;
     }
-    this.gameOverMenu.active = true;
-    this.gameOverMenu.setSiblingIndex(this.node.children.length - 1);
-
+    if (resultBoardNode) {
+      getUITransform(resultBoardNode)?.setContentSize(320, 180);
+      resultBoardNode.setPosition(0, 35, 0);
+      resultBoardNode.active = true;
+      ensureUIOpacity(resultBoardNode).opacity = 255;
+    }
     if (gameOverNode) {
       ensureUIOpacity(gameOverNode).opacity = 255;
       const goLabel = gameOverNode.getComponent(Label);
       if (goLabel) {
         goLabel.string = '游戏结束';
-        goLabel.fontSize = 42;
+        goLabel.fontSize = 44;
+        goLabel.color = Color.WHITE;
+        goLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
       }
-      gameOverNode.setPosition(0, 200, 0);
+      // 有些场景 gameOverLabel 是 Sprite「GAME OVER」图，再叠一个清晰标题
+      this.ensureGameOverTitle(gameOverNode);
+      gameOverNode.setPosition(0, 210, 0);
+      gameOverNode.active = true;
     }
+
+    // 全屏遮罩 + 弹层置顶，盖住场上 START / 鸟 / 管
+    if (this.gameOverBackdrop) {
+      this.gameOverBackdrop.active = true;
+      ensureUIOpacity(this.gameOverBackdrop).opacity = 210;
+      this.gameOverBackdrop.setSiblingIndex(this.node.children.length - 1);
+    }
+    if (this.gameOverPanel) {
+      this.gameOverPanel.active = true;
+      this.gameOverPanel.setSiblingIndex(this.node.children.length - 1);
+    }
+
+    // 扩大 menu 命中区域，并保证整层可见
+    getUITransform(this.gameOverMenu)?.setContentSize(520, 640);
+    this.gameOverMenu.active = true;
+    ensureUIOpacity(this.gameOverMenu).opacity = 255;
+    // 顺序：遮罩 < 面板 < 菜单按钮（菜单必须最顶）
+    if (this.gameOverBackdrop) {
+      this.gameOverBackdrop.setSiblingIndex(this.node.children.length - 1);
+    }
+    if (this.gameOverPanel) {
+      this.gameOverPanel.setSiblingIndex(this.node.children.length - 1);
+    }
+    this.gameOverMenu.setSiblingIndex(this.node.children.length - 1);
+
+    // 重新绑定，复活后再失败也要能点
     if (startButtonNode) {
-      ensureUIOpacity(startButtonNode).opacity = 255;
       startButtonNode.off(Node.EventType.TOUCH_END, this.restart, this);
       startButtonNode.on(Node.EventType.TOUCH_END, this.restart, this);
     }
@@ -473,6 +524,98 @@ export class FbGame3x extends Component {
     }
   }
 
+  /** 失败弹层：全屏暗色遮罩 + 中央面板，盖住场上 START 图。 */
+  ensureGameOverChrome() {
+    const canvas = this.node;
+    const cw = getUITransform(canvas)?.width || 960;
+    const ch = getUITransform(canvas)?.height || 640;
+
+    if (!this.gameOverBackdrop || !this.gameOverBackdrop.isValid) {
+      const backdrop = new Node('gameOverBackdrop');
+      backdrop.layer = canvas.layer;
+      const ui = backdrop.addComponent(UITransform);
+      ui.setContentSize(cw, ch);
+      backdrop.setPosition(0, 0, 0);
+      const g = backdrop.addComponent(Graphics);
+      g.clear();
+      g.fillColor = new Color(8, 16, 36, 220);
+      g.rect(-cw / 2, -ch / 2, cw, ch);
+      g.fill();
+      backdrop.addComponent(BlockInputEvents);
+      ensureUIOpacity(backdrop).opacity = 210;
+      backdrop.active = false;
+      canvas.addChild(backdrop);
+      this.gameOverBackdrop = backdrop;
+    } else {
+      const ui = getUITransform(this.gameOverBackdrop);
+      ui?.setContentSize(cw, ch);
+    }
+
+    if (!this.gameOverPanel || !this.gameOverPanel.isValid) {
+      const panel = new Node('gameOverPanel');
+      panel.layer = canvas.layer;
+      const pui = panel.addComponent(UITransform);
+      pui.setContentSize(420, 520);
+      panel.setPosition(0, 10, 0);
+      const g = panel.addComponent(Graphics);
+      g.clear();
+      g.fillColor = new Color(22, 36, 64, 245);
+      g.roundRect(-210, -260, 420, 520, 18);
+      g.fill();
+      g.strokeColor = new Color(120, 160, 220, 180);
+      g.lineWidth = 3;
+      g.roundRect(-210, -260, 420, 520, 18);
+      g.stroke();
+      panel.active = false;
+      canvas.addChild(panel);
+      this.gameOverPanel = panel;
+    }
+  }
+
+  ensureGameOverTitle(gameOverNode: Node) {
+    // 场景里红色 GAME OVER 贴图/旧 Label 会和「游戏结束」叠在一起 → 关掉
+    const oldSprite = gameOverNode.getComponent(Sprite);
+    if (oldSprite) {
+      oldSprite.enabled = false;
+    }
+    const oldLabel = gameOverNode.getComponent(Label);
+    if (oldLabel) {
+      oldLabel.enabled = false;
+      oldLabel.string = '';
+    }
+
+    let title = gameOverNode.getChildByName('clearTitle');
+    if (!title) {
+      title = new Node('clearTitle');
+      title.layer = gameOverNode.layer;
+      title.addComponent(UITransform).setContentSize(320, 60);
+      const label = title.addComponent(Label);
+      label.string = '游戏结束';
+      label.fontSize = 44;
+      label.color = Color.WHITE;
+      label.isBold = true;
+      label.enableOutline = true;
+      label.outlineColor = new Color(20, 24, 40, 220);
+      label.outlineWidth = 3;
+      label.horizontalAlign = Label.HorizontalAlign.CENTER;
+      label.verticalAlign = Label.VerticalAlign.CENTER;
+      gameOverNode.addChild(title);
+    } else {
+      const label = title.getComponent(Label);
+      if (label) {
+        label.string = '游戏结束';
+        label.color = Color.WHITE;
+        label.enableOutline = true;
+        label.outlineColor = new Color(20, 24, 40, 220);
+        label.outlineWidth = 3;
+      }
+    }
+    title.setPosition(0, 0, 0);
+    title.active = true;
+    ensureUIOpacity(title).opacity = 255;
+    title.setSiblingIndex(gameOverNode.children.length - 1);
+  }
+
   /** 给结算板两行分数加「本局/最高」前缀，避免只显示两个相同数字。 */
   setScoreRow(node: Node | null | undefined, title: string, value: number) {
     if (!node) {
@@ -484,32 +627,104 @@ export class FbGame3x extends Component {
     }
     label.string = `${title}  ${value}`;
     label.fontSize = 30;
+    label.color = Color.WHITE;
     label.horizontalAlign = Label.HorizontalAlign.LEFT;
     getUITransform(node)?.setContentSize(200, 44);
+    ensureUIOpacity(node).opacity = 255;
+    node.active = true;
   }
 
-  enlargeHitTarget(node: Node | null | undefined, w: number, h: number, text: string, fontSize: number) {
+  /** 实心色块按钮：盖住场景 START 图，并放大可点区域。 */
+  styleActionButton(
+    node: Node | null | undefined,
+    w: number,
+    h: number,
+    text: string,
+    fontSize: number,
+    bgColor: Color,
+  ) {
     if (!node) {
       return;
     }
     getUITransform(node)?.setContentSize(w, h);
-    let label = node.getComponent(Label);
-    if (!label) {
-      label = node.getComponentInChildren(Label);
+
+    // 背景色块（Graphics），盖住原 START 贴图；必须在文字节点之下
+    let bg = node.getChildByName('btnBg');
+    if (!bg) {
+      bg = new Node('btnBg');
+      bg.layer = node.layer;
+      bg.addComponent(UITransform).setContentSize(w, h);
+      bg.setPosition(0, 0, 0);
+      node.insertChild(bg, 0);
     }
-    if (!label) {
-      const child = new Node('label');
-      child.layer = node.layer;
-      child.addComponent(UITransform).setContentSize(w, h);
-      label = child.addComponent(Label);
-      node.addChild(child);
+    getUITransform(bg)?.setContentSize(w, h);
+    let g = bg.getComponent(Graphics);
+    if (!g) {
+      g = bg.addComponent(Graphics);
     }
+    g.clear();
+    g.fillColor = bgColor;
+    g.roundRect(-w / 2, -h / 2, w, h, 12);
+    g.fill();
+    ensureUIOpacity(bg).opacity = 255;
+    bg.active = true;
+    bg.setSiblingIndex(0);
+
+    // 原 Sprite（START 图）直接关掉，避免盖住文案
+    const sprite = node.getComponent(Sprite);
+    if (sprite) {
+      sprite.enabled = false;
+      sprite.color = new Color(255, 255, 255, 0);
+    }
+
+    // 根节点 Label 会先于子节点绘制，文字会被 btnBg 盖住 → 关掉，改用顶层子 Label
+    const rootLabel = node.getComponent(Label);
+    if (rootLabel) {
+      rootLabel.enabled = false;
+      rootLabel.string = '';
+    }
+
+    let labelNode = node.getChildByName('btnLabel') || node.getChildByName('label');
+    if (!labelNode) {
+      labelNode = new Node('btnLabel');
+      labelNode.layer = node.layer;
+      labelNode.addComponent(UITransform).setContentSize(w - 16, h - 8);
+      labelNode.setPosition(0, 0, 0);
+      node.addChild(labelNode);
+    } else {
+      labelNode.name = 'btnLabel';
+    }
+    getUITransform(labelNode)?.setContentSize(w - 16, h - 8);
+    labelNode.setPosition(0, 0, 0);
+
+    let label = labelNode.getComponent(Label);
+    if (!label) {
+      label = labelNode.addComponent(Label);
+    }
+    label.enabled = true;
     label.string = text;
     label.fontSize = fontSize;
+    // 白字 + 深色描边：灰/橙底都能看清（不是同色看不见）
+    label.color = Color.WHITE;
+    label.isBold = true;
+    label.enableOutline = true;
+    label.outlineColor = new Color(20, 24, 40, 230);
+    label.outlineWidth = 3;
     label.horizontalAlign = Label.HorizontalAlign.CENTER;
     label.verticalAlign = Label.VerticalAlign.CENTER;
     label.overflow = Label.Overflow.SHRINK;
+    label.cacheMode = Label.CacheMode.NONE;
+    ensureUIOpacity(labelNode).opacity = 255;
+    labelNode.active = true;
+    // 文字永远在色块之上
+    labelNode.setSiblingIndex(node.children.length - 1);
+
     ensureUIOpacity(node).opacity = 255;
+    node.active = true;
+  }
+
+  enlargeHitTarget(node: Node | null | undefined, w: number, h: number, text: string, fontSize: number) {
+    this.styleActionButton(node, w, h, text, fontSize, new Color(70, 90, 130, 255));
   }
 
   backToStart() {
@@ -517,14 +732,27 @@ export class FbGame3x extends Component {
   }
 
   onReviveClick() {
-    if (this.revivedThisRun) {
+    if (this.revivedThisRun || !this.gameOverShown) {
       return;
     }
     this.enableInput(false);
     // 先播激励广告（预览/无 adUnit 时走模拟全屏广告，不再瞬间复活）
     AdManager.showRewarded().then((finished) => {
       if (!finished) {
-        this.enableInput(true);
+        // 没看完：保持失败弹窗可见，可再点
+        this.gameOverShown = true;
+        if (this.gameOverMenu) {
+          this.gameOverMenu.active = true;
+          this.gameOverMenu.setSiblingIndex(this.node.children.length - 1);
+        }
+        if (this.gameOverBackdrop) {
+          this.gameOverBackdrop.active = true;
+          this.gameOverBackdrop.setSiblingIndex(this.node.children.length - 2);
+        }
+        if (this.gameOverPanel) {
+          this.gameOverPanel.active = true;
+          this.gameOverPanel.setSiblingIndex(this.node.children.length - 2);
+        }
         const tips = this.gameOverMenu?.getChildByName('tipsLabel')?.getComponent(Label);
         if (tips) {
           tips.string = '未看完广告，无法复活';
@@ -542,17 +770,34 @@ export class FbGame3x extends Component {
       return;
     }
     this.gameOverMenu.active = false;
+    if (this.gameOverBackdrop) {
+      this.gameOverBackdrop.active = false;
+    }
+    if (this.gameOverPanel) {
+      this.gameOverPanel.active = false;
+    }
     this.scoreLabel.node.active = true;
     ensureUIOpacity(this.scoreLabel.node).opacity = 255;
   }
 
   resumeGameAfterRevive() {
+    // 先清标记：即便后续 early return，也不要卡住第二次失败弹窗
+    this.gameOverShown = false;
+    this.isPaused = false;
+    if (this.gameOverMenu) {
+      this.gameOverMenu.active = false;
+    }
+    if (this.gameOverBackdrop) {
+      this.gameOverBackdrop.active = false;
+    }
+    if (this.gameOverPanel) {
+      this.gameOverPanel.active = false;
+    }
+
     const canvas = find('Canvas');
     if (!canvas || !this.bird || !this.ground) {
       return;
     }
-    this.gameOverShown = false;
-    this.isPaused = false;
 
     // 安全复活点：画布水平偏左、垂直居中偏上，避开地面与死亡点
     const canvasH = getUITransform(canvas)?.height || 640;
