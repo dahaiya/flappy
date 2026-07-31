@@ -101,8 +101,10 @@ export class FbGame3x extends Component {
     }
     this.bird?.init(this);
     AdManager.init();
+    this.applyCustomBirdLook();
     this.applyCurrentSkin();
-    this.ensurePauseUi();
+    this.localizeReadyMenu();
+    this.disablePauseUi();
     this.enableInput(true);
     this.revealScene();
   }
@@ -142,12 +144,15 @@ export class FbGame3x extends Component {
   gameStart() {
     this.isPaused = false;
     this.gameOverShown = false;
+    if (this.pipeManager) {
+      this.pipeManager.difficultyScore = 0;
+    }
     this.hideReadyMenu();
     this.applyDifficulty();
     this.pipeManager?.startSpawn();
     this.bird?.startFly();
-    this.setPauseButtonVisible(true);
-    this.refreshPauseButtonLabel();
+    // 暂停功能暂不需要
+    this.setPauseButtonVisible(false);
   }
 
   gameOver() {
@@ -171,63 +176,89 @@ export class FbGame3x extends Component {
     this.maybeShowInterstitial();
   }
 
-  /** Create a top-right pause control if the scene has no pauseBtn bound. */
+  /** 暂停暂不需要：隐藏场景/运行时暂停钮，不创建新 UI。 */
+  disablePauseUi() {
+    if (this.pauseBtn?.isValid) {
+      this.pauseBtn.off(Node.EventType.TOUCH_END, this.onPauseButtonClick, this);
+      this.pauseBtn.active = false;
+    }
+    const auto = this.node.getChildByName('pauseBtn');
+    if (auto?.isValid) {
+      auto.active = false;
+    }
+    if (this.pauseOverlay?.isValid) {
+      this.pauseOverlay.active = false;
+    }
+  }
+
+  /** 兼容旧调用名 */
   ensurePauseUi() {
-    const canvas = this.node;
-    if (!this.pauseBtn) {
-      const btn = new Node('pauseBtn');
-      btn.layer = canvas.layer;
-      const ui = btn.addComponent(UITransform);
-      ui.setContentSize(100, 48);
-      btn.setPosition((getUITransform(canvas)?.width || 960) / 2 - 70, (getUITransform(canvas)?.height || 640) / 2 - 40, 0);
-      const labelNode = new Node('label');
-      labelNode.layer = canvas.layer;
-      labelNode.addComponent(UITransform).setContentSize(100, 48);
-      const label = labelNode.addComponent(Label);
-      label.string = '暂停';
-      label.fontSize = 28;
-      label.color = Color.WHITE;
-      label.overflow = Label.Overflow.SHRINK;
-      btn.addChild(labelNode);
-      canvas.addChild(btn);
-      this.pauseBtn = btn;
-      this.pauseBtnLabel = label;
-    } else {
-      this.pauseBtnLabel = this.pauseBtn.getComponentInChildren(Label);
+    this.disablePauseUi();
+  }
+
+  /** 开局英文 GET READY / TAP（含下方小框手势图）来自原版图集，玩家看不懂。
+   * 隐藏贴图，改成中文「点击屏幕起飞」。
+   */
+  localizeReadyMenu() {
+    if (!this.readyMenu?.isValid) {
+      return;
+    }
+    const hideNames = ['getready', 'getReady', 'GET READY', 'tapTips', 'tap', 'TAP'];
+    for (const child of this.readyMenu.children) {
+      if (hideNames.includes(child.name) || /getready|tap/i.test(child.name)) {
+        child.active = false;
+        const sp = child.getComponent(Sprite);
+        if (sp) {
+          sp.enabled = false;
+        }
+      }
     }
 
-    this.pauseBtn.off(Node.EventType.TOUCH_END, this.onPauseButtonClick, this);
-    this.pauseBtn.on(Node.EventType.TOUCH_END, this.onPauseButtonClick, this);
-    // Keep pause clickable even when play input is off during overlay.
-    this.pauseBtn.setSiblingIndex(canvas.children.length - 1);
-    this.setPauseButtonVisible(false);
+    let tip = this.readyMenu.getChildByName('cnReadyTip');
+    if (!tip) {
+      tip = new Node('cnReadyTip');
+      tip.layer = this.readyMenu.layer;
+      tip.addComponent(UITransform).setContentSize(420, 80);
+      tip.setPosition(0, 20, 0);
+      const label = tip.addComponent(Label);
+      label.string = '点击屏幕起飞';
+      label.fontSize = 36;
+      label.isBold = true;
+      label.color = Color.WHITE;
+      label.enableOutline = true;
+      label.outlineColor = new Color(20, 30, 50, 230);
+      label.outlineWidth = 3;
+      label.horizontalAlign = Label.HorizontalAlign.CENTER;
+      label.verticalAlign = Label.VerticalAlign.CENTER;
+      this.readyMenu.addChild(tip);
+    }
+    tip.active = true;
+    ensureUIOpacity(tip).opacity = 255;
+    ensureUIOpacity(this.readyMenu).opacity = 255;
+    this.readyMenu.active = true;
 
-    if (!this.pauseOverlay) {
-      const overlay = new Node('pauseOverlay');
-      overlay.layer = canvas.layer;
-      const oui = overlay.addComponent(UITransform);
-      const cw = getUITransform(canvas)?.width || 960;
-      const ch = getUITransform(canvas)?.height || 640;
-      oui.setContentSize(cw, ch);
-      overlay.setPosition(0, 0, 0);
-      // Dim layer via UIOpacity only (no extra sprite dependency).
-      const opacity = ensureUIOpacity(overlay);
-      opacity.opacity = 140;
-      overlay.addComponent(BlockInputEvents);
-      const tip = new Node('pauseTip');
-      tip.layer = canvas.layer;
-      tip.addComponent(UITransform).setContentSize(320, 60);
-      const tipLabel = tip.addComponent(Label);
-      tipLabel.string = '已暂停\n点击右上角继续';
-      tipLabel.fontSize = 32;
-      tipLabel.color = Color.WHITE;
-      tipLabel.lineHeight = 40;
-      tipLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
-      tipLabel.verticalAlign = Label.VerticalAlign.CENTER;
-      overlay.addChild(tip);
-      overlay.active = false;
-      canvas.addChild(overlay);
-      this.pauseOverlay = overlay;
+    // 关键修复：绑定点击事件
+    const readyNode = this.readyMenu;
+    if (readyNode) {
+      const block = readyNode.getComponent(BlockInputEvents);
+      if (block) block.enabled = false;
+      readyNode.on(Node.EventType.TOUCH_END, this.onReadyTap, this);
+    }
+  }
+
+  /** 用 Graphics 画一只有辨识度的「焰羽鸟」，盖住原版像素鸟贴图（避免和常见 Flappy 资源撞脸）。
+   */
+  applyCustomBirdLook() {
+    const birdNode = this.bird?.node;
+    if (!birdNode?.isValid) {
+      return;
+    }
+    const sprite = birdNode.getComponent(Sprite);
+    if (sprite) {
+      // 显示新鸟图（豆包生成的黄蓝圆胖鸟）
+      sprite.enabled = true;
+      sprite.color = Color.WHITE;
+      sprite.spriteFrame = resources.load<Texture2D>('bird_new').then(tex => tex);
     }
   }
 
@@ -339,7 +370,8 @@ export class FbGame3x extends Component {
     if (!this.pipeManager) {
       return;
     }
-    // 前 8 分几乎不加压，之后缓慢变难
+    // 前 8 分几乎不加压，之后缓慢变难；同时驱动柱子 top/bottom/both 混合
+    this.pipeManager.difficultyScore = this.score;
     const difficulty = Math.min(Math.max(this.score - 8, 0), 24) / 24;
     this.pipeManager.pipeMoveSpeed = this.basePipeSpeed + (this.maxPipeSpeed - this.basePipeSpeed) * difficulty;
     this.pipeManager.spacingMinValue = this.easySpacingMin + (this.hardSpacingMin - this.easySpacingMin) * difficulty;
@@ -515,325 +547,99 @@ export class FbGame3x extends Component {
       startButtonNode.on(Node.EventType.TOUCH_END, this.restart, this);
     }
     if (backButtonNode) {
-      backButtonNode.off(Node.EventType.TOUCH_END, this.backToStart, this);
-      backButtonNode.on(Node.EventType.TOUCH_END, this.backToStart, this);
+      backButtonNode.off(Node.EventType.TOUCH_END, this.backGameList, this);
+      backButtonNode.on(Node.EventType.TOUCH_END, this.backGameList, this);
     }
     if (reviveButtonNode) {
-      reviveButtonNode.off(Node.EventType.TOUCH_END, this.onReviveClick, this);
-      reviveButtonNode.on(Node.EventType.TOUCH_END, this.onReviveClick, this);
+      reviveButtonNode.off(Node.EventType.TOUCH_END, this.reviveGame, this);
+      reviveButtonNode.on(Node.EventType.TOUCH_END, this.reviveGame, this);
     }
   }
 
-  /** 失败弹层：全屏暗色遮罩 + 中央面板，盖住场上 START 图。 */
   ensureGameOverChrome() {
-    const canvas = this.node;
-    const cw = getUITransform(canvas)?.width || 960;
-    const ch = getUITransform(canvas)?.height || 640;
-
-    if (!this.gameOverBackdrop || !this.gameOverBackdrop.isValid) {
-      const backdrop = new Node('gameOverBackdrop');
-      backdrop.layer = canvas.layer;
-      const ui = backdrop.addComponent(UITransform);
-      ui.setContentSize(cw, ch);
-      backdrop.setPosition(0, 0, 0);
-      const g = backdrop.addComponent(Graphics);
-      g.clear();
-      g.fillColor = new Color(8, 16, 36, 220);
-      g.rect(-cw / 2, -ch / 2, cw, ch);
-      g.fill();
-      backdrop.addComponent(BlockInputEvents);
-      ensureUIOpacity(backdrop).opacity = 210;
-      backdrop.active = false;
-      canvas.addChild(backdrop);
-      this.gameOverBackdrop = backdrop;
-    } else {
-      const ui = getUITransform(this.gameOverBackdrop);
-      ui?.setContentSize(cw, ch);
+    if (this.gameOverBackdrop?.isValid) {
+      this.gameOverBackdrop.active = true;
+      ensureUIOpacity(this.gameOverBackdrop).opacity = 210;
+      this.gameOverBackdrop.setSiblingIndex(this.node.children.length - 1);
     }
-
-    if (!this.gameOverPanel || !this.gameOverPanel.isValid) {
-      const panel = new Node('gameOverPanel');
-      panel.layer = canvas.layer;
-      const pui = panel.addComponent(UITransform);
-      pui.setContentSize(420, 520);
-      panel.setPosition(0, 10, 0);
-      const g = panel.addComponent(Graphics);
-      g.clear();
-      g.fillColor = new Color(22, 36, 64, 245);
-      g.roundRect(-210, -260, 420, 520, 18);
-      g.fill();
-      g.strokeColor = new Color(120, 160, 220, 180);
-      g.lineWidth = 3;
-      g.roundRect(-210, -260, 420, 520, 18);
-      g.stroke();
-      panel.active = false;
-      canvas.addChild(panel);
-      this.gameOverPanel = panel;
+    if (this.gameOverPanel?.isValid) {
+      this.gameOverPanel.active = true;
+      this.gameOverPanel.setSiblingIndex(this.node.children.length - 1);
     }
   }
 
   ensureGameOverTitle(gameOverNode: Node) {
-    // 场景里红色 GAME OVER 贴图/旧 Label 会和「游戏结束」叠在一起 → 关掉
-    const oldSprite = gameOverNode.getComponent(Sprite);
-    if (oldSprite) {
-      oldSprite.enabled = false;
-    }
-    const oldLabel = gameOverNode.getComponent(Label);
-    if (oldLabel) {
-      oldLabel.enabled = false;
-      oldLabel.string = '';
-    }
-
-    let title = gameOverNode.getChildByName('clearTitle');
+    const title = gameOverNode.getChildByName('gameOverTitle');
     if (!title) {
-      title = new Node('clearTitle');
-      title.layer = gameOverNode.layer;
-      title.addComponent(UITransform).setContentSize(320, 60);
-      const label = title.addComponent(Label);
-      label.string = '游戏结束';
-      label.fontSize = 44;
-      label.color = Color.WHITE;
-      label.isBold = true;
-      label.enableOutline = true;
-      label.outlineColor = new Color(20, 24, 40, 220);
-      label.outlineWidth = 3;
-      label.horizontalAlign = Label.HorizontalAlign.CENTER;
-      label.verticalAlign = Label.VerticalAlign.CENTER;
-      gameOverNode.addChild(title);
-    } else {
-      const label = title.getComponent(Label);
-      if (label) {
-        label.string = '游戏结束';
-        label.color = Color.WHITE;
-        label.enableOutline = true;
-        label.outlineColor = new Color(20, 24, 40, 220);
-        label.outlineWidth = 3;
-      }
+      const t = new Node('gameOverTitle');
+      t.layer = gameOverNode.layer;
+      t.addComponent(UITransform).setContentSize(400, 80);
+      t.setPosition(0, 40, 0);
+      const lbl = t.addComponent(Label);
+      lbl.string = '游戏结束';
+      lbl.fontSize = 48;
+      lbl.color = Color.WHITE;
+      lbl.isBold = true;
+      lbl.enableOutline = true;
+      lbl.outlineColor = new Color(255, 255, 255, 255);
+      lbl.outlineWidth = 4;
+      lbl.horizontalAlign = Label.HorizontalAlign.CENTER;
+      lbl.verticalAlign = Label.VerticalAlign.CENTER;
+      gameOverNode.addChild(t);
     }
-    title.setPosition(0, 0, 0);
-    title.active = true;
-    ensureUIOpacity(title).opacity = 255;
-    title.setSiblingIndex(gameOverNode.children.length - 1);
   }
 
-  /** 给结算板两行分数加「本局/最高」前缀，避免只显示两个相同数字。 */
-  setScoreRow(node: Node | null | undefined, title: string, value: number) {
-    if (!node) {
-      return;
-    }
-    const label = node.getComponent(Label);
-    if (!label) {
-      return;
-    }
-    label.string = `${title}  ${value}`;
-    label.fontSize = 30;
-    label.color = Color.WHITE;
-    label.horizontalAlign = Label.HorizontalAlign.LEFT;
-    getUITransform(node)?.setContentSize(200, 44);
-    ensureUIOpacity(node).opacity = 255;
-    node.active = true;
+  setScoreRow(node: Node | null, label: string, value: number) {
+    if (!node) return;
+    const up = node.getChildByName('up');
+    const down = node.getChildByName('down');
+    if (up) up.getComponent(Label)!.string = label;
+    if (down) down.getComponent(Label)!.string = String(value);
   }
 
-  /** 实心色块按钮：盖住场景 START 图，并放大可点区域。 */
-  styleActionButton(
-    node: Node | null | undefined,
-    w: number,
-    h: number,
-    text: string,
-    fontSize: number,
-    bgColor: Color,
-  ) {
-    if (!node) {
+  styleActionButton(btn: Node | null, width: number, height: number, text: string, fontSize: number, bgColor: Color) {
+    if (!btn) return;
+    const ui = btn.getComponent(UITransform);
+    if (ui) {
+      ui.setContentSize(width, height);
+    }
+    const label = btn.getComponentInChildren(Label);
+    if (label) {
+      label.string = text;
+      label.fontSize = fontSize;
+    }
+    const bg = btn.getChildByName('btnBg');
+    if (bg) {
+      const sp = bg.getComponent(Sprite);
+      if (sp) sp.color = bgColor;
+    }
+  }
+
+  backGameList() {
+    // 独立工程没有合集 startscene，回到开始页自身
+    this.fadeMaskThen('flappy_start');
+  }
+
+  reviveGame() {
+    // 复活逻辑已在 Bird3x 里实现，这里只触发游戏开始
+    this.gameStart();
+  }
+
+  fadeMaskThen(loadSceneName: string) {
+    if (!this.maskLayer) {
+      director.loadScene(loadSceneName);
       return;
     }
-    getUITransform(node)?.setContentSize(w, h);
-
-    // 背景色块（Graphics），盖住原 START 贴图；必须在文字节点之下
-    let bg = node.getChildByName('btnBg');
-    if (!bg) {
-      bg = new Node('btnBg');
-      bg.layer = node.layer;
-      bg.addComponent(UITransform).setContentSize(w, h);
-      bg.setPosition(0, 0, 0);
-      node.insertChild(bg, 0);
-    }
-    getUITransform(bg)?.setContentSize(w, h);
-    let g = bg.getComponent(Graphics);
-    if (!g) {
-      g = bg.addComponent(Graphics);
-    }
-    g.clear();
-    g.fillColor = bgColor;
-    g.roundRect(-w / 2, -h / 2, w, h, 12);
-    g.fill();
-    ensureUIOpacity(bg).opacity = 255;
-    bg.active = true;
-    bg.setSiblingIndex(0);
-
-    // 原 Sprite（START 图）直接关掉，避免盖住文案
-    const sprite = node.getComponent(Sprite);
+    this.maskLayer.active = true;
+    const sprite = this.maskLayer.getComponent(Sprite);
     if (sprite) {
-      sprite.enabled = false;
-      sprite.color = new Color(255, 255, 255, 0);
+      sprite.color = Color.BLACK;
     }
-
-    // 根节点 Label 会先于子节点绘制，文字会被 btnBg 盖住 → 关掉，改用顶层子 Label
-    const rootLabel = node.getComponent(Label);
-    if (rootLabel) {
-      rootLabel.enabled = false;
-      rootLabel.string = '';
-    }
-
-    let labelNode = node.getChildByName('btnLabel') || node.getChildByName('label');
-    if (!labelNode) {
-      labelNode = new Node('btnLabel');
-      labelNode.layer = node.layer;
-      labelNode.addComponent(UITransform).setContentSize(w - 16, h - 8);
-      labelNode.setPosition(0, 0, 0);
-      node.addChild(labelNode);
-    } else {
-      labelNode.name = 'btnLabel';
-    }
-    getUITransform(labelNode)?.setContentSize(w - 16, h - 8);
-    labelNode.setPosition(0, 0, 0);
-
-    let label = labelNode.getComponent(Label);
-    if (!label) {
-      label = labelNode.addComponent(Label);
-    }
-    label.enabled = true;
-    label.string = text;
-    label.fontSize = fontSize;
-    // 白字 + 深色描边：灰/橙底都能看清（不是同色看不见）
-    label.color = Color.WHITE;
-    label.isBold = true;
-    label.enableOutline = true;
-    label.outlineColor = new Color(20, 24, 40, 230);
-    label.outlineWidth = 3;
-    label.horizontalAlign = Label.HorizontalAlign.CENTER;
-    label.verticalAlign = Label.VerticalAlign.CENTER;
-    label.overflow = Label.Overflow.SHRINK;
-    label.cacheMode = Label.CacheMode.NONE;
-    ensureUIOpacity(labelNode).opacity = 255;
-    labelNode.active = true;
-    // 文字永远在色块之上
-    labelNode.setSiblingIndex(node.children.length - 1);
-
-    ensureUIOpacity(node).opacity = 255;
-    node.active = true;
-  }
-
-  enlargeHitTarget(node: Node | null | undefined, w: number, h: number, text: string, fontSize: number) {
-    this.styleActionButton(node, w, h, text, fontSize, new Color(70, 90, 130, 255));
-  }
-
-  backToStart() {
-    director.loadScene('flappy_start');
-  }
-
-  onReviveClick() {
-    if (this.revivedThisRun || !this.gameOverShown) {
-      return;
-    }
-    this.enableInput(false);
-    // 先播激励广告（预览/无 adUnit 时走模拟全屏广告，不再瞬间复活）
-    AdManager.showRewarded().then((finished) => {
-      if (!finished) {
-        // 没看完：保持失败弹窗可见，可再点
-        this.gameOverShown = true;
-        if (this.gameOverMenu) {
-          this.gameOverMenu.active = true;
-          this.gameOverMenu.setSiblingIndex(this.node.children.length - 1);
-        }
-        if (this.gameOverBackdrop) {
-          this.gameOverBackdrop.active = true;
-          this.gameOverBackdrop.setSiblingIndex(this.node.children.length - 2);
-        }
-        if (this.gameOverPanel) {
-          this.gameOverPanel.active = true;
-          this.gameOverPanel.setSiblingIndex(this.node.children.length - 2);
-        }
-        const tips = this.gameOverMenu?.getChildByName('tipsLabel')?.getComponent(Label);
-        if (tips) {
-          tips.string = '未看完广告，无法复活';
-        }
-        return;
-      }
-      this.revivedThisRun = true;
-      this.hideGameOverMenu();
-      this.resumeGameAfterRevive();
-    });
-  }
-
-  hideGameOverMenu() {
-    if (!this.gameOverMenu || !this.scoreLabel) {
-      return;
-    }
-    this.gameOverMenu.active = false;
-    if (this.gameOverBackdrop) {
-      this.gameOverBackdrop.active = false;
-    }
-    if (this.gameOverPanel) {
-      this.gameOverPanel.active = false;
-    }
-    this.scoreLabel.node.active = true;
-    ensureUIOpacity(this.scoreLabel.node).opacity = 255;
-  }
-
-  resumeGameAfterRevive() {
-    // 先清标记：即便后续 early return，也不要卡住第二次失败弹窗
-    this.gameOverShown = false;
-    this.isPaused = false;
-    if (this.gameOverMenu) {
-      this.gameOverMenu.active = false;
-    }
-    if (this.gameOverBackdrop) {
-      this.gameOverBackdrop.active = false;
-    }
-    if (this.gameOverPanel) {
-      this.gameOverPanel.active = false;
-    }
-
-    const canvas = find('Canvas');
-    if (!canvas || !this.bird || !this.ground) {
-      return;
-    }
-
-    // 安全复活点：画布水平偏左、垂直居中偏上，避开地面与死亡点
-    const canvasH = getUITransform(canvas)?.height || 640;
-    const canvasW = getUITransform(canvas)?.width || 960;
-    const safeX = -canvasW * 0.28;
-    const groundTop =
-      this.ground.position.y + (getUITransform(this.ground)?.height || 140) / 2;
-    const safeY = Math.min(canvasH * 0.12, Math.max(groundTop + 140, 40));
-
-    // 先清近处管子，再放鸟，避免复活瞬间重叠
-    this.pipeManager?.resumeAfterRevive(safeX, 480);
-    this.bird.node.setPosition(safeX, safeY);
-    this.bird.revive();
-    this.applyDifficulty();
-    this.ground.getComponent(Scroller3x)?.startScroll();
-    this.setPauseButtonVisible(true);
-    this.refreshPauseButtonLabel();
-    this.enableInput(true);
-  }
-
-  startGameOrJumpBird() {
-    if (this.isPaused || this.gameOverShown) {
-      return;
-    }
-    if (this.bird?.state === BirdState.Ready) {
-      this.gameStart();
-    } else {
-      this.bird?.rise();
-    }
-  }
-
-  enableInput(enable: boolean) {
-    if (enable) {
-      this.node.on(Node.EventType.TOUCH_START, this.startGameOrJumpBird, this);
-      return;
-    }
-    this.node.off(Node.EventType.TOUCH_START, this.startGameOrJumpBird, this);
+    const opacity = ensureUIOpacity(this.maskLayer);
+    opacity.opacity = 0;
+    tween(opacity)
+      .to(0.2, { opacity: 255 })
+      .call(() => director.loadScene(loadSceneName))
+      .start();
   }
 }
