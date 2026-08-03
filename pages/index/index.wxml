@@ -1,0 +1,5 @@
+<!--pages/index/index.wxml-->
+<view class="wrap">
+  <text class="title">欢乐躲避</text>
+  <text class="hint">微信壳已就绪。Cocos 游戏需 Creator 构建到 build 后再接入。</text>
+</view>
