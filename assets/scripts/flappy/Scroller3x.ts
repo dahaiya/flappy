@@ -19,7 +19,7 @@ export class Scroller3x extends Component {
 
   private canScroll = true;
   /** Width of one ground strip; used to wrap the pair. */
-  private stripWidth = 960;
+  private stripWidth = 720;
 
   start() {
     this.layoutStrips();
@@ -37,7 +37,7 @@ export class Scroller3x extends Component {
     if (!canvasTransform || !selfTransform || !longTransform) {
       return;
     }
-    this.stripWidth = canvasTransform.width || 960;
+    this.stripWidth = canvasTransform.width || 720;
     selfTransform.width = this.stripWidth;
     longTransform.width = this.stripWidth;
     // Keep Y; place strips side by side

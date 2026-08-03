@@ -1,4 +1,4 @@
-import { _decorator, Component, instantiate, Node, NodePool, Prefab } from 'cc';
+import { _decorator, Color, Component, instantiate, NodePool, Prefab } from 'cc';
 import { PipeGroup3x } from './PipeGroup3x';
 const { ccclass, property } = _decorator;
 
@@ -9,21 +9,33 @@ export class PipeManager3x extends Component {
 
   /** 更慢，降低难度 */
   @property
-  pipeMoveSpeed = -180;
+  pipeMoveSpeed = -190;
 
-  /** 管间距（生成间隔用），略加大喘息 */
+  /** 管间距（生成间隔用）；竖屏略收，画面更密 */
   @property
-  pipeSpacing = 380;
-
-  @property
-  spacingMinValue = 260;
+  pipeSpacing = 280;
 
   @property
-  spacingMaxValue = 320;
+  spacingMinValue = 250;
+
+  @property
+  spacingMaxValue = 300;
 
   pipeList: PipeGroup3x[] = [];
   activePipeList: PipeGroup3x[] = [];
   pipeIsRunning = false;
+  /** 供 PipeGroup 按得分混合 top/bottom/both 布局 */
+  difficultyScore = 0;
+
+  /** 困难模式：橙色预警 + 垂直浮动柱 */
+  hardMode = false;
+  /** 困难模式柱体染色 */
+  hardPipeTint = new Color(255, 152, 0, 255);
+  /** 垂直浮动幅度（像素） */
+  verticalAmp = 28;
+  /** 垂直浮动角速度 */
+  verticalOmega = 1.35;
+
   private pipePool = new NodePool();
 
   onLoad() {
@@ -135,5 +147,6 @@ export class PipeManager3x extends Component {
     this.pipeList = [];
     this.activePipeList = [];
     this.pipeIsRunning = false;
+    this.difficultyScore = 0;
   }
 }

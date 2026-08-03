@@ -2,11 +2,14 @@
   "__version__": "1.0.6",
   "general": {
     "designResolution": {
-      "width": 960,
-      "height": 640
+      "width": 720,
+      "height": 1560,
+      "fitWidth": true,
+      "fitHeight": false
     }
   },
   "script": {
     "preserveSymlinks": true
-  }
+  },
+  "custom_joint_texture_layouts": []
 }

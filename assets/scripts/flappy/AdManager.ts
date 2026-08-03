@@ -336,10 +336,15 @@ class AdManager {
         finish(!!(result && result.isEnded));
       };
 
-      const showOnce = () =>
-        ad.show().then(() => {
-          ad.onClose?.(onClose);
-        });
+      // 必须先 onClose 再 show，否则关广告时可能丢回调
+      try {
+        ad.offClose?.(onClose);
+      } catch {
+        /* ignore */
+      }
+      ad.onClose?.(onClose);
+
+      const showOnce = () => ad.show();
 
       // 对齐 demo：show 失败 → load 再 show；仍失败则 mock 兜底（避免复活按钮假死）
       showOnce()
@@ -355,7 +360,11 @@ class AdManager {
             const msg = AD_ERR[err?.errCode] || err?.errMsg || '广告拉起失败，使用模拟广告';
             wx.showToast({ title: String(msg).slice(0, 20), icon: 'none' });
           }
-          this.showMockRewarded(resolve);
+          // finish 尚未 settle 时走 mock；mock 内部 resolve
+          if (!settled) {
+            settled = true;
+            this.showMockRewarded(resolve);
+          }
         });
     });
   }
@@ -371,8 +380,8 @@ class AdManager {
     const layer = new Node('MockRewardedAd');
     layer.layer = canvas.layer;
     const ui = layer.addComponent(UITransform);
-    const cw = canvas.getComponent(UITransform)?.width || 960;
-    const ch = canvas.getComponent(UITransform)?.height || 640;
+    const cw = canvas.getComponent(UITransform)?.width || 720;
+    const ch = canvas.getComponent(UITransform)?.height || 1560;
     ui.setContentSize(cw, ch);
     layer.setPosition(0, 0, 0);
     const g = layer.addComponent(Graphics);

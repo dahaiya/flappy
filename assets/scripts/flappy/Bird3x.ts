@@ -141,13 +141,13 @@ export class Bird3x extends Component {
       return g.position.y + groundHalf + birdHalf;
     }
     const canvas = find('Canvas');
-    const canvasH = canvas?.getComponent(UITransform)?.height || 640;
+    const canvasH = canvas?.getComponent(UITransform)?.height || 1560;
     return -canvasH / 2 + birdHalf;
   }
 
   getPlayBounds() {
     const canvas = find('Canvas');
-    const canvasH = canvas?.getComponent(UITransform)?.height || 640;
+    const canvasH = canvas?.getComponent(UITransform)?.height || 1560;
     const birdHalf = (this.node.getComponent(UITransform)?.height || 60) / 2;
     const topY = canvasH / 2 - birdHalf;
     const bottomY = this.getGroundTopY(birdHalf);
@@ -226,10 +226,11 @@ export class Bird3x extends Component {
       if (!group?.node?.isValid) {
         continue;
       }
-      if (this.nodeHitsPipeSprite(group.node, group.topPipe, birdL, birdR, birdB, birdT)) {
+      // top-only / bottom-only 时另一根会 active=false，跳过
+      if (group.topPipe?.active && this.nodeHitsPipeSprite(group.node, group.topPipe, birdL, birdR, birdB, birdT)) {
         return true;
       }
-      if (this.nodeHitsPipeSprite(group.node, group.bottomPipe, birdL, birdR, birdB, birdT)) {
+      if (group.bottomPipe?.active && this.nodeHitsPipeSprite(group.node, group.bottomPipe, birdL, birdR, birdB, birdT)) {
         return true;
       }
     }
