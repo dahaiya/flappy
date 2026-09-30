@@ -24,5 +24,13 @@ Thumbs.db
 .env
 .env.*
 
+# Secrets / credentials (never commit keys or tokens)
+deploy_key
+*.pem
+*.key
+id_rsa
+id_ed25519
+known_hosts
+
 # Optional local creator cache (keep project settings)
 .creator/default-meta.json
