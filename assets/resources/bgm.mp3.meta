@@ -1,0 +1,50 @@
+{
+  "ver": "1.0.30",
+  "importer": "audio",
+  "imported": true,
+  "uuid": "c3492c97-76f7-4979-8158-d0fe449c5c1e",
+  "files": [
+    ".mp3",
+    ".json"
+  ],
+  "subMetas": {
+    "7036e": {
+      "importer": "audio-clip",
+      "uuid": "c3492c97-76f7-4979-8158-d0fe449c5c1e@7036e",
+      "displayName": "bgm",
+      "id": "7036e",
+      "name": "audio-clip",
+      "userData": {
+        "loop": true,
+        "isUuid": true
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "type": "audio-clip",
+    "loadType": 1,
+    "sampleRateSetting": 1,
+    "sampleRateOverride": 44100,
+    "compressionFormat": 1,
+    "quality": 0.45,
+    "conversionMode": 0,
+    "preloadAudioData": 1,
+    "platformSettingOverrides": {},
+    "forceToMono": 0,
+    "normalize": 1,
+    "loadInBackground": 0,
+    "amplification": 1,
+    "shouldSuppressComplete": true,
+    "shouldUseAccurateTime": false,
+    "amplificationLevel": 1,
+    "ambisonic": 0,
+    "3D": 0,
+    "redirect": "c3492c97-76f7-4979-8158-d0fe449c5c1e@7036e"
+  }
+}

@@ -2,6 +2,7 @@ import { _decorator, Camera, Color, Component, director, find, Graphics, Label, 
 import AdManager from './AdManager';
 import { applyCuteYellowBird } from './CuteBirdArt';
 import SkinManager from './SkinManager';
+import { settings } from './SettingsManager';
 const { ccclass, property } = _decorator;
 
 declare const wx: any;
@@ -64,6 +65,7 @@ export class BirdGameStart3x extends Component {
     this.setupModeButtons();
     this.setupShareButton();
     this.bindHomeButtons();
+    this.setupSettings();
   }
 
   /** 竖屏铺满背景/地面（兼容旧包仍是 960x640 场景） */
@@ -483,6 +485,7 @@ export class BirdGameStart3x extends Component {
   }
 
   startWithMode(mode: DifficultyMode) {
+    this.ensureAudioReady();
     setDifficultyMode(mode);
     this.refreshModeButtonStyles();
     this.startGame();
@@ -543,6 +546,24 @@ export class BirdGameStart3x extends Component {
     }
     const share = canvas.getChildByName('shareBtn') || canvas.getChildByName('shareActionBtn');
     this.bindShareHandlers(share);
+  }
+
+  /** 右上角设置齿轮（开始页）。 */
+  private setupSettings() {
+    settings.init();
+    settings.ensureGear();
+  }
+
+  /** 用户首次手势：解锁音频上下文并按开关播放背景音乐。 */
+  private firstGestureUnlocked = false;
+
+  /** 首次交互时解锁音频 + 同步背景音乐开关。在「开始」点击的同步栈里调用。 */
+  private ensureAudioReady() {
+    if (this.firstGestureUnlocked) {
+      return;
+    }
+    this.firstGestureUnlocked = true;
+    settings.onFirstGesture();
   }
 
   private fadeMaskThen(loadSceneName: string) {

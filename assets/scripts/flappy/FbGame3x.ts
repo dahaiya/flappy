@@ -3,6 +3,8 @@ import AdManager from './AdManager';
 import SkinManager from './SkinManager';
 import { Bird3x, BirdState } from './Bird3x';
 import { applyCuteYellowBird } from './CuteBirdArt';
+import { gameAudio } from './GameAudio';
+import { settings } from './SettingsManager';
 import { getDifficultyMode, type DifficultyMode } from './BirdGameStart3x';
 import { PipeManager3x } from './PipeManager3x';
 import { Scroller3x } from './Scroller3x';
@@ -111,6 +113,9 @@ export class FbGame3x extends Component {
     }
     this.bird?.init(this);
     AdManager.init();
+    // 设置：右上角齿轮（游戏内也可开关背景音乐/音效/震动）
+    settings.init();
+    settings.ensureGear();
     // 竖屏铺满：旧包场景可能仍是 960x640，背景会被裁成一条
     this.fitPlayfieldToCanvas();
     // 先绑输入/Ready，再改外观，避免外观逻辑抛错导致「点了没反应」
@@ -275,6 +280,8 @@ export class FbGame3x extends Component {
     this.isPaused = false;
     this.gameOverShown = false;
     this.difficultyMode = getDifficultyMode();
+    // 开局背景音乐常驻（按「背景音乐」开关）
+    gameAudio.startBgm();
     if (this.pipeManager) {
       this.pipeManager.difficultyScore = 0;
       this.pipeManager.hardMode = this.difficultyMode === 'hard';
@@ -308,6 +315,10 @@ export class FbGame3x extends Component {
     this.setPauseButtonVisible(false);
     this.hidePauseOverlay();
     this.blinkOnce();
+    // 失败音效（音效开则响）
+    gameAudio.playDie(settings.soundOn);
+    // 失败后停背景音乐（下一局开局再播）
+    gameAudio.stopBgm();
     this.showGameOverMenu();
     this.maybeShowInterstitial();
   }
@@ -483,6 +494,8 @@ export class FbGame3x extends Component {
     if (this.scoreLabel) {
       this.scoreLabel.string = String(this.score);
     }
+    // 过柱子：音效（音效开）+ 震动（震动开）
+    gameAudio.playPass(settings.soundOn, settings.vibrateOn);
     this.applyDifficulty();
   }
 

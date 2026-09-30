@@ -1,0 +1,50 @@
+{
+  "ver": "1.0.30",
+  "importer": "audio",
+  "imported": true,
+  "uuid": "0eff2321-e92e-46db-b706-6ab607d866e8",
+  "files": [
+    ".mp3",
+    ".json"
+  ],
+  "subMetas": {
+    "c35be": {
+      "importer": "audio-clip",
+      "uuid": "0eff2321-e92e-46db-b706-6ab607d866e8@c35be",
+      "displayName": "flap",
+      "id": "c35be",
+      "name": "audio-clip",
+      "userData": {
+        "loop": false,
+        "isUuid": true
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "type": "audio-clip",
+    "loadType": 1,
+    "sampleRateSetting": 1,
+    "sampleRateOverride": 44100,
+    "compressionFormat": 1,
+    "quality": 0.45,
+    "conversionMode": 0,
+    "preloadAudioData": 1,
+    "platformSettingOverrides": {},
+    "forceToMono": 0,
+    "normalize": 1,
+    "loadInBackground": 0,
+    "amplification": 1,
+    "shouldSuppressComplete": true,
+    "shouldUseAccurateTime": false,
+    "amplificationLevel": 1,
+    "ambisonic": 0,
+    "3D": 0,
+    "redirect": "0eff2321-e92e-46db-b706-6ab607d866e8@c35be"
+  }
+}

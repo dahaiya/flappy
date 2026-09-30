@@ -1,0 +1,50 @@
+{
+  "ver": "1.0.30",
+  "importer": "audio",
+  "imported": true,
+  "uuid": "aa30b208-c7ca-4070-93ef-b1c95cf85e5f",
+  "files": [
+    ".mp3",
+    ".json"
+  ],
+  "subMetas": {
+    "5b5c4": {
+      "importer": "audio-clip",
+      "uuid": "aa30b208-c7ca-4070-93ef-b1c95cf85e5f@5b5c4",
+      "displayName": "pass",
+      "id": "5b5c4",
+      "name": "audio-clip",
+      "userData": {
+        "loop": false,
+        "isUuid": true
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "type": "audio-clip",
+    "loadType": 1,
+    "sampleRateSetting": 1,
+    "sampleRateOverride": 44100,
+    "compressionFormat": 1,
+    "quality": 0.45,
+    "conversionMode": 0,
+    "preloadAudioData": 1,
+    "platformSettingOverrides": {},
+    "forceToMono": 0,
+    "normalize": 1,
+    "loadInBackground": 0,
+    "amplification": 1,
+    "shouldSuppressComplete": true,
+    "shouldUseAccurateTime": false,
+    "amplificationLevel": 1,
+    "ambisonic": 0,
+    "3D": 0,
+    "redirect": "aa30b208-c7ca-4070-93ef-b1c95cf85e5f@5b5c4"
+  }
+}

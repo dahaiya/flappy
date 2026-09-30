@@ -1,0 +1,50 @@
+{
+  "ver": "1.0.30",
+  "importer": "audio",
+  "imported": true,
+  "uuid": "e76994d2-c8c9-48b3-85d5-878d7df5172d",
+  "files": [
+    ".mp3",
+    ".json"
+  ],
+  "subMetas": {
+    "9ff9e": {
+      "importer": "audio-clip",
+      "uuid": "e76994d2-c8c9-48b3-85d5-878d7df5172d@9ff9e",
+      "displayName": "die",
+      "id": "9ff9e",
+      "name": "audio-clip",
+      "userData": {
+        "loop": false,
+        "isUuid": true
+      },
+      "ver": "1.0.14",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "type": "audio-clip",
+    "loadType": 1,
+    "sampleRateSetting": 1,
+    "sampleRateOverride": 44100,
+    "compressionFormat": 1,
+    "quality": 0.45,
+    "conversionMode": 0,
+    "preloadAudioData": 1,
+    "platformSettingOverrides": {},
+    "forceToMono": 0,
+    "normalize": 1,
+    "loadInBackground": 0,
+    "amplification": 1,
+    "shouldSuppressComplete": true,
+    "shouldUseAccurateTime": false,
+    "amplificationLevel": 1,
+    "ambisonic": 0,
+    "3D": 0,
+    "redirect": "e76994d2-c8c9-48b3-85d5-878d7df5172d@9ff9e"
+  }
+}
